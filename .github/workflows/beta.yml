@@ -1,0 +1,118 @@
+name: Build and Release Beta
+
+on:
+  push:
+    branches:
+      - Beta
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate beta version from commit message
+        id: check
+        run: |
+          MSG=$(git log -1 --pretty=%s)
+          if echo "$MSG" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-beta(\.[0-9]+)?$'; then
+            echo "version=$MSG" >> $GITHUB_OUTPUT
+            echo "✓ Valid beta version: $MSG"
+          else
+            echo "✗ Commit message '$MSG' is not a valid beta version"
+            echo "Example: 1.0.0-beta or 1.0.0-beta.1"
+            exit 1
+          fi
+
+  build-macos:
+    needs: validate
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: xcode-select --install 2>/dev/null || true
+      - name: Build Apple Silicon
+        run: |
+          make clean || true
+          CFLAGS="-target arm64-apple-macos11" make VERSION=${{ needs.validate.outputs.version }}
+          mv dynaserve dynaserve-darwin-arm64
+      - name: Build Intel
+        run: |
+          make clean
+          CFLAGS="-target x86_64-apple-macos10.13" make VERSION=${{ needs.validate.outputs.version }}
+          mv dynaserve dynaserve-darwin-x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-binaries
+          path: |
+            dynaserve-darwin-arm64
+            dynaserve-darwin-x86_64
+
+  build-linux:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc make gcc-aarch64-linux-gnu
+      - name: Build x86_64
+        run: |
+          make clean || true
+          make VERSION=${{ needs.validate.outputs.version }}
+          mv dynaserve dynaserve-linux-x86_64
+      - name: Build aarch64
+        run: |
+          make clean
+          CC=aarch64-linux-gnu-gcc make VERSION=${{ needs.validate.outputs.version }}
+          mv dynaserve dynaserve-linux-aarch64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-binaries
+          path: |
+            dynaserve-linux-x86_64
+            dynaserve-linux-aarch64
+
+  release:
+    needs: [validate, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: binaries
+      - name: Organize binaries
+        run: |
+          mkdir -p release
+          mv binaries/macos-binaries/* release/
+          mv binaries/linux-binaries/* release/
+          chmod +x release/*
+      - name: Create Beta Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.validate.outputs.version }}
+          name: Beta ${{ needs.validate.outputs.version }}
+          body: |
+            ## ⚠️ Beta Release ${{ needs.validate.outputs.version }}
+            
+            This is a beta release. Use with caution.
+            
+            ### Install Beta
+            ```bash
+            dynaserve --update --beta
+            ```
+          draft: false
+          prerelease: true
+          files: |
+            release/dynaserve-darwin-arm64
+            release/dynaserve-darwin-x86_64
+            release/dynaserve-linux-x86_64
+            release/dynaserve-linux-aarch64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
