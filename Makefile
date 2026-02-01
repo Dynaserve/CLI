@@ -2,7 +2,7 @@
 
 CC = cc
 CFLAGS ?= -Wall -Wextra -O2
-SRC = src/main.c src/help.c src/version.c src/update.c src/login.c src/utils.c
+SRC = src/main.c src/help.c src/version.c src/update.c src/utils.c
 OUT = dynaserve
 
 # Version can be set via make VERSION=1.0.0 or from git tag
