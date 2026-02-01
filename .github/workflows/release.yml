@@ -6,7 +6,31 @@ on:
       - Release
 
 jobs:
+  # ─── Validate commit message is a version ───────────────────────
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate version from commit message
+        id: check
+        run: |
+          MSG=$(git log -1 --pretty=%s)
+          if echo "$MSG" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "version=$MSG" >> $GITHUB_OUTPUT
+            echo "✓ Valid version: $MSG"
+          else
+            echo "✗ Commit message '$MSG' is not a valid version (x.x.x)"
+            echo "Example: git commit -m '1.0.0'"
+            exit 1
+          fi
+
+  # ─── macOS builds (arm64 + x86_64) ──────────────────────────────
   build-macos:
+    needs: validate
     runs-on: macos-latest
     
     steps:
@@ -19,13 +43,13 @@ jobs:
       - name: Build CLI for Apple Silicon (arm64)
         run: |
           make clean || true
-          CFLAGS="-target arm64-apple-macos11" make
+          CFLAGS="-target arm64-apple-macos11" make VERSION=${{ needs.validate.outputs.version }}
           mv dynaserve dynaserve-darwin-arm64
       
       - name: Build CLI for Intel (x86_64)
         run: |
           make clean
-          CFLAGS="-target x86_64-apple-macos10.13" make
+          CFLAGS="-target x86_64-apple-macos10.13" make VERSION=${{ needs.validate.outputs.version }}
           mv dynaserve dynaserve-darwin-x86_64
       
       - name: Verify macOS binaries
@@ -33,6 +57,7 @@ jobs:
           echo "=== Apple Silicon Binary ==="
           file dynaserve-darwin-arm64
           ls -lh dynaserve-darwin-arm64
+          ./dynaserve-darwin-arm64 --version || true
           echo ""
           echo "=== Intel Binary ==="
           file dynaserve-darwin-x86_64
@@ -46,7 +71,9 @@ jobs:
             dynaserve-darwin-arm64
             dynaserve-darwin-x86_64
 
+  # ─── Linux builds (x86_64 + aarch64) ────────────────────────────
   build-linux:
+    needs: validate
     runs-on: ubuntu-latest
     
     steps:
@@ -54,28 +81,44 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential gcc make
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc make gcc-aarch64-linux-gnu
       
       - name: Build CLI for Linux (x86_64)
         run: |
           make clean || true
-          make
+          make VERSION=${{ needs.validate.outputs.version }}
           mv dynaserve dynaserve-linux-x86_64
       
-      - name: Verify Linux binary
+      - name: Build CLI for Linux (aarch64)
         run: |
-          echo "=== Linux Binary ==="
+          make clean
+          CC=aarch64-linux-gnu-gcc make VERSION=${{ needs.validate.outputs.version }}
+          mv dynaserve dynaserve-linux-aarch64
+      
+      - name: Verify Linux binaries
+        run: |
+          echo "=== Linux x86_64 Binary ==="
           file dynaserve-linux-x86_64
           ls -lh dynaserve-linux-x86_64
+          ./dynaserve-linux-x86_64 --version
+          echo ""
+          echo "=== Linux aarch64 Binary ==="
+          file dynaserve-linux-aarch64
+          ls -lh dynaserve-linux-aarch64
       
-      - name: Upload Linux binary
+      - name: Upload Linux binaries
         uses: actions/upload-artifact@v4
         with:
-          name: linux-binary
-          path: dynaserve-linux-x86_64
+          name: linux-binaries
+          path: |
+            dynaserve-linux-x86_64
+            dynaserve-linux-aarch64
 
+  # ─── Create release ─────────────────────────────────────────────
   release:
-    needs: [build-macos, build-linux]
+    needs: [validate, build-macos, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -95,78 +138,53 @@ jobs:
         run: |
           mkdir -p release
           mv binaries/macos-binaries/* release/
-          mv binaries/linux-binary/* release/
+          mv binaries/linux-binaries/* release/
+          chmod +x release/*
           ls -lh release/
-      
-      - name: Determine version bump
-        id: version_bump
-        run: |
-          # Get latest tag or default to 0.0.0
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
-          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-          
-          IFS='.' read -r -a VERSION <<< "${LATEST_TAG#v}"
-          MAJOR="${VERSION[0]:-0}"
-          MINOR="${VERSION[1]:-0}"
-          PATCH="${VERSION[2]:-0}"
-          
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          echo "Commit message: $COMMIT_MSG"
-          
-          if echo "$COMMIT_MSG" | grep -iq "Release: Major"; then
-            MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0; BUMP_TYPE="Major"
-          elif echo "$COMMIT_MSG" | grep -iq "Release: Minor"; then
-            MINOR=$((MINOR + 1)); PATCH=0; BUMP_TYPE="Minor"
-          else
-            PATCH=$((PATCH + 1)); BUMP_TYPE="Patch (default)"
-          fi
-          
-          NEW_TAG="${MAJOR}.${MINOR}.${PATCH}"
-          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
-          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
-          echo "New version: $NEW_TAG (${BUMP_TYPE} bump)"
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.version_bump.outputs.new_tag }}
-          name: Release ${{ steps.version_bump.outputs.new_tag }}
+          tag_name: ${{ needs.validate.outputs.version }}
+          name: Release ${{ needs.validate.outputs.version }}
           body: |
-            ## Release ${{ steps.version_bump.outputs.new_tag }}
-            
-            **Version Bump:** ${{ steps.version_bump.outputs.bump_type }}
+            ## Release ${{ needs.validate.outputs.version }}
             
             ### Installation
 
+             **Quick Installer:**
+            ```bash
+            curl -sSL https://cli.dynaserve.io/install | bash
+            ```
+
             **macOS - Apple Silicon (arm64):**
             ```bash
-            curl -L -o dynaserve https://github.com/${{ github.repository }}/releases/download/${{ steps.version_bump.outputs.new_tag }}/dynaserve-darwin-arm64
-            chmod +x dynaserve
-            sudo mv dynaserve /usr/local/bin/
+            curl -L -o dynaserve https://github.com/${{ github.repository }}/releases/download/${{ needs.validate.outputs.version }}/dynaserve-darwin-arm64
+            chmod +x dynaserve && sudo mv dynaserve /usr/local/bin/
             ```
 
             **macOS - Intel (x86_64):**
             ```bash
-            curl -L -o dynaserve https://github.com/${{ github.repository }}/releases/download/${{ steps.version_bump.outputs.new_tag }}/dynaserve-darwin-x86_64
-            chmod +x dynaserve
-            sudo mv dynaserve /usr/local/bin/
+            curl -L -o dynaserve https://github.com/${{ github.repository }}/releases/download/${{ needs.validate.outputs.version }}/dynaserve-darwin-x86_64
+            chmod +x dynaserve && sudo mv dynaserve /usr/local/bin/
             ```
 
             **Linux (x86_64):**
             ```bash
-            curl -L -o dynaserve https://github.com/${{ github.repository }}/releases/download/${{ steps.version_bump.outputs.new_tag }}/dynaserve-linux-x86_64
-            chmod +x dynaserve
-            sudo mv dynaserve /usr/local/bin/
+            curl -L -o dynaserve https://github.com/${{ github.repository }}/releases/download/${{ needs.validate.outputs.version }}/dynaserve-linux-x86_64
+            chmod +x dynaserve && sudo mv dynaserve /usr/local/bin/
             ```
 
-            ### Auto-Update
-            Run:
+            **Linux (aarch64):**
             ```bash
-            dynaserve update
+            curl -L -o dynaserve https://github.com/${{ github.repository }}/releases/download/${{ needs.validate.outputs.version }}/dynaserve-linux-aarch64
+            chmod +x dynaserve && sudo mv dynaserve /usr/local/bin/
             ```
             
-            ### Full Changelog
-            https://github.com/${{ github.repository }}/compare/${{ steps.version_bump.outputs.latest_tag }}...${{ steps.version_bump.outputs.new_tag }}
+            ### Verify Installation
+            ```bash
+            dynaserve --version
+            ```
           
           draft: false
           prerelease: false
@@ -174,5 +192,6 @@ jobs:
             release/dynaserve-darwin-arm64
             release/dynaserve-darwin-x86_64
             release/dynaserve-linux-x86_64
+            release/dynaserve-linux-aarch64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

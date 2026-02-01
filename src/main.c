@@ -10,6 +10,7 @@ int main(int argc, char *argv[]) {
 
     if (strcmp(command, "help") == 0 || strcmp(command, "-h") == 0) print_help();
     else if (strcmp(command, "--version") == 0 || strcmp(command, "--v") == 0) show_version();
+    else if (strcmp(command, "--update") == 0 || strcmp(command, "--u") == 0) show_version();
     else {
         printf(COLOR_RED "Unknown command: %s\n" COLOR_RESET, command);
         printf("Use 'help' or '-h' to see available commands.\n");
