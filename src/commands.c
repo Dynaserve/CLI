@@ -136,7 +136,7 @@ void show_version() {
     if (fetch_latest_version(&info)) {
         int cmp = compare_versions(installed, info.version);
         if (cmp < 0) {
-            printf(COLOR_YELLOW "\n⚠ Update available: %s → %s\n" COLOR_RESET, installed, info.version);
+            printf(COLOR_YELLOW "⚠ Update available: %s → %s\n" COLOR_RESET, installed, info.version);
             printf(COLOR_YELLOW "Run " COLOR_GREEN "sudo dynaserve --update" COLOR_YELLOW " to upgrade\n" COLOR_RESET);
         }
     }
