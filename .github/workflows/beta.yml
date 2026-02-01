@@ -17,12 +17,12 @@ jobs:
         id: check
         run: |
           MSG=$(git log -1 --pretty=%s)
-          if echo "$MSG" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-beta(\.[0-9]+)?$'; then
+          if echo "$MSG" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "version=$MSG" >> $GITHUB_OUTPUT
             echo "✓ Valid beta version: $MSG"
           else
             echo "✗ Commit message '$MSG' is not a valid beta version"
-            echo "Example: 1.0.0-beta or 1.0.0-beta.1"
+            echo "Example: 1.0.0"
             exit 1
           fi
 
@@ -104,6 +104,7 @@ jobs:
             This is a beta release. Use with caution.
             
             ### Install Beta
+            
             ```bash
             dynaserve --update --beta
             ```
