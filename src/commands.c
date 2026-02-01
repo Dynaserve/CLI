@@ -35,6 +35,22 @@ const char* get_platform_string() {
 #endif
 }
 
+// ---------------- Version Comparison ----------------
+// Returns: -1 if v1 < v2, 0 if equal, 1 if v1 > v2
+int compare_versions(const char *v1, const char *v2) {
+    int major1 = 0, minor1 = 0, patch1 = 0;
+    int major2 = 0, minor2 = 0, patch2 = 0;
+    
+    sscanf(v1, "%d.%d.%d", &major1, &minor1, &patch1);
+    sscanf(v2, "%d.%d.%d", &major2, &minor2, &patch2);
+    
+    if (major1 != major2) return (major1 > major2) ? 1 : -1;
+    if (minor1 != minor2) return (minor1 > minor2) ? 1 : -1;
+    if (patch1 != patch2) return (patch1 > patch2) ? 1 : -1;
+    
+    return 0;
+}
+
 // ---------------- Fetch Latest Version from API ----------------
 int fetch_latest_version(VersionInfo *info) {
     char cmd[512];
@@ -128,10 +144,16 @@ void update_cli() {
     
     printf(COLOR_BLUE "Installed version: " COLOR_RESET "%s\n", installed);
     printf(COLOR_BLUE "Latest version:    " COLOR_RESET "%s\n", info.version);
-    printf(COLOR_BLUE "Download URL:      " COLOR_RESET "%s\n", info.url);
     
-    if (strcmp(installed, info.version) == 0) {
+    // Compare versions properly
+    int cmp = compare_versions(installed, info.version);
+    
+    if (cmp == 0) {
         printf(COLOR_GREEN "✓ You are already running the latest version!\n" COLOR_RESET);
+        return;
+    } else if (cmp > 0) {
+        printf(COLOR_YELLOW "⚠ You are running a newer version than what's available.\n" COLOR_RESET);
+        printf(COLOR_BLUE "Installed: %s, Latest: %s\n" COLOR_RESET, installed, info.version);
         return;
     }
     
@@ -178,7 +200,6 @@ void update_cli() {
              "curl -L --fail -o \"%s.new\" \"%s\"", exe_path, info.url);
     
     printf(COLOR_YELLOW "Downloading %s...\n" COLOR_RESET, info.version);
-    printf(COLOR_BLUE "Running: %s\n" COLOR_RESET, download_cmd);
     
     int ret = system(download_cmd);
     if (ret != 0) {
