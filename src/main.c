@@ -14,8 +14,8 @@ int main(int argc, char *argv[]) {
     else if (strcmp(command, "--version") == 0 || strcmp(command, "--v") == 0) {
         show_version();
     }
-    else if (strcmp(command, "check") == 0) {
-        check_version();
+    else if (strcmp(command, "--update") == 0) {
+        update_cli();
     }
     else {
         printf(COLOR_RED "Unknown command: %s\n" COLOR_RESET, command);

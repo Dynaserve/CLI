@@ -15,11 +15,17 @@
 
 #define API_URL "https://cli.dynaserve.io/version"
 
+typedef struct {
+    char version[64];
+    char url[512];
+} VersionInfo;
+
 const char* get_installed_version();
-int fetch_latest_version(char *version_out, size_t size);
+const char* get_platform_string();
+int fetch_latest_version(VersionInfo *info);
 
 void print_help();
 void show_version();
-void check_version();
+void update_cli();
 
 #endif /* CORE_H */
