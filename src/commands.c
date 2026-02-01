@@ -122,9 +122,9 @@ int fetch_latest_version(VersionInfo *info) {
 // ---------------- Commands ----------------
 void print_help() {
     printf(COLOR_BLUE "Dynaserve CLI Commands:\n" COLOR_RESET);
-    printf(COLOR_GREEN "  help" COLOR_RESET "           Show this help message\n");
-    printf(COLOR_GREEN "  --version" COLOR_RESET "      Show installed CLI version\n");
-    printf(COLOR_GREEN "  --update" COLOR_RESET "       Update to latest version\n");
+    printf(COLOR_GREEN "  help" COLOR_RESET "           Show this help message.\n");
+    printf(COLOR_GREEN "  --version" COLOR_RESET "      Show installed CLI version.\n");
+    printf(COLOR_GREEN "  --update" COLOR_RESET "       Update to latest version.\n");
 }
 
 void show_version() {
