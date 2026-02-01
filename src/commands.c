@@ -180,8 +180,6 @@ void update_cli() {
     return;
 #endif
     
-    printf(COLOR_BLUE "Binary location:   " COLOR_RESET "%s\n", exe_path);
-    
     // Check if we can write to the directory (better check than just the file)
     char dir_path[PATH_MAX];
     snprintf(dir_path, sizeof(dir_path), "%s", exe_path);
@@ -189,8 +187,12 @@ void update_cli() {
     if (last_slash) *last_slash = '\0';
     
     if (access(dir_path, W_OK) != 0) {
-        printf(COLOR_RED "Cannot write to %s/\n" COLOR_RESET, dir_path);
-        printf(COLOR_YELLOW "Please run: sudo dynaserve --update\n" COLOR_RESET);
+        if (geteuid() != 0) {
+            printf(COLOR_YELLOW "Root privileges required to update system binary.\n" COLOR_RESET);
+            printf(COLOR_YELLOW "Please run: " COLOR_GREEN "sudo dynaserve --update\n" COLOR_RESET);
+        } else {
+            printf(COLOR_RED "Cannot write to %s/\n" COLOR_RESET, dir_path);
+        }
         return;
     }
     
