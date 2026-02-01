@@ -1,42 +1,6 @@
 #include "core.h"
 
-// Fallback if VERSION not defined at compile time
-#ifndef VERSION
-#define VERSION "unknown"
-#endif
-
-// ---------------- Installed Version ----------------
-const char* get_installed_version() {
-    static char version[128] = {0};
-    
-    if (version[0] == '\0') {
-        snprintf(version, sizeof(version), "%s", VERSION);
-    }
-    
-    if (strcmp(version, "unknown") == 0) {
-        return COLOR_RED "version unknown" COLOR_RESET;
-    }
-    
-    return version;
-}
-
-// ---------------- Platform Detection ----------------
-const char* get_platform_string() {
-#if defined(__APPLE__) && defined(__arm64__)
-    return "darwin-arm64";
-#elif defined(__APPLE__) && defined(__x86_64__)
-    return "darwin-x86_64";
-#elif defined(__linux__) && defined(__aarch64__)
-    return "linux-aarch64";
-#elif defined(__linux__) && defined(__x86_64__)
-    return "linux-x86_64";
-#else
-    return "unknown";
-#endif
-}
-
-// ---------------- Version Comparison ----------------
-// Returns: -1 if v1 < v2, 0 if equal, 1 if v1 > v2
+// Version comparison: returns -1 if v1 < v2, 0 if equal, 1 if v1 > v2
 int compare_versions(const char *v1, const char *v2) {
     int major1 = 0, minor1 = 0, patch1 = 0;
     int major2 = 0, minor2 = 0, patch2 = 0;
@@ -51,7 +15,6 @@ int compare_versions(const char *v1, const char *v2) {
     return 0;
 }
 
-// ---------------- Fetch Latest Version from API ----------------
 int fetch_latest_version(VersionInfo *info) {
     char cmd[512];
     snprintf(cmd, sizeof(cmd), "curl -s --connect-timeout 3 %s 2>/dev/null", API_URL);
@@ -119,29 +82,6 @@ int fetch_latest_version(VersionInfo *info) {
     return 1;
 }
 
-// ---------------- Commands ----------------
-void print_help() {
-    printf(COLOR_BLUE "Dynaserve CLI Commands:\n" COLOR_RESET);
-    printf(COLOR_GREEN "  help" COLOR_RESET "           Show this help message.\n");
-    printf(COLOR_GREEN "  --version" COLOR_RESET "      Show installed CLI version.\n");
-    printf(COLOR_GREEN "  --update" COLOR_RESET "       Update to latest version.\n");
-}
-
-void show_version() {
-    const char *installed = get_installed_version();
-    printf(COLOR_GREEN "Dynaserve CLI %s\n" COLOR_RESET, installed);
-    
-    // Quick update check
-    VersionInfo info = {0};
-    if (fetch_latest_version(&info)) {
-        int cmp = compare_versions(installed, info.version);
-        if (cmp < 0) {
-            printf(COLOR_YELLOW "⚠ Update available: %s → %s\n" COLOR_RESET, installed, info.version);
-            printf(COLOR_YELLOW "Run " COLOR_GREEN "sudo dynaserve --update" COLOR_YELLOW " to upgrade\n" COLOR_RESET);
-        }
-    }
-}
-
 void update_cli() {
     const char *installed = get_installed_version();
     VersionInfo info = {0};
@@ -191,7 +131,7 @@ void update_cli() {
     return;
 #endif
     
-    // Check if we can write to the directory (better check than just the file)
+    // Check if we can write to the directory
     char dir_path[PATH_MAX];
     snprintf(dir_path, sizeof(dir_path), "%s", exe_path);
     char *last_slash = strrchr(dir_path, '/');

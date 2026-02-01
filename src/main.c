@@ -17,6 +17,9 @@ int main(int argc, char *argv[]) {
     else if (strcmp(command, "--update") == 0) {
         update_cli();
     }
+    else if (strcmp(command, "--login") == 0) {
+        login_cli();
+    }
     else {
         printf(COLOR_RED "Unknown command: %s\n" COLOR_RESET, command);
         printf("Use 'help' or '-h' to see available commands.\n");
