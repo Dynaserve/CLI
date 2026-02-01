@@ -123,8 +123,8 @@ int fetch_latest_version(VersionInfo *info) {
 void print_help() {
     printf(COLOR_BLUE "Dynaserve CLI Commands:\n" COLOR_RESET);
     printf(COLOR_GREEN "  help" COLOR_RESET "           Show this help message\n");
-    printf(COLOR_GREEN "  --version" COLOR_RESET "      Show installed CLI version\n");
-    printf(COLOR_GREEN "  --update" COLOR_RESET "       Update CLI to latest version\n");
+    printf(COLOR_GREEN "  --v, --version" COLOR_RESET "  Show installed CLI version\n");
+    printf(COLOR_GREEN "  --update" COLOR_RESET "       Update to latest version\n");
 }
 
 void show_version() {
@@ -136,7 +136,7 @@ void show_version() {
     if (fetch_latest_version(&info)) {
         int cmp = compare_versions(installed, info.version);
         if (cmp < 0) {
-            printf(COLOR_YELLOW "⚠ Update available: %s → %s\n" COLOR_RESET, installed, info.version);
+            printf(COLOR_YELLOW "\n⚠ Update available: %s → %s\n" COLOR_RESET, installed, info.version);
             printf(COLOR_YELLOW "Run " COLOR_GREEN "sudo dynaserve --update" COLOR_YELLOW " to upgrade\n" COLOR_RESET);
         }
     }
@@ -210,7 +210,7 @@ void update_cli() {
     // Download new binary
     char download_cmd[1024];
     snprintf(download_cmd, sizeof(download_cmd), 
-             "curl -L --fail -o \"%s.new\" \"%s\"", exe_path, info.url);
+             "curl -sL --fail -o \"%s.new\" \"%s\"", exe_path, info.url);
     
     printf(COLOR_YELLOW "Downloading %s...\n" COLOR_RESET, info.version);
     
@@ -220,6 +220,8 @@ void update_cli() {
         printf(COLOR_YELLOW "Try manually downloading from: %s\n" COLOR_RESET, info.url);
         return;
     }
+    
+    printf(COLOR_GREEN "Downloaded %s...\n" COLOR_RESET, info.version);
     
     // Make new binary executable
     char chmod_cmd[1024];
